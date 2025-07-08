@@ -1,7 +1,8 @@
 data "nginxproxymanager_access_lists" "access_lists" {}
 
 module "service_dns" {
-  source = "../dns"
+  source   = "git@github.com:DCCoder90/home-tf-modules.git//dns?ref=1.0.0"
+
   count = var.service.dns.enabled ? 1 : 0
 
   internal_only = var.service.network.internal

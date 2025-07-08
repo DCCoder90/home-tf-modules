@@ -1,7 +1,5 @@
-
-
 module "service_container" {
-  source   = "../../modules/docker"
+  source   = "git@github.com:DCCoder90/home-tf-modules.git//docker?ref=1.0.0"
 
   icon                   = var.service.icon
   web_ui                 = try(var.service.network.service_port, null) != null && local.service_ip_address != null ? "http://${local.service_ip_address}:${var.service.network.service_port}" : null
