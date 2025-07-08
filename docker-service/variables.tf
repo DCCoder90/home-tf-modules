@@ -20,11 +20,11 @@ variable "service" {
     volumes = optional(list(string))
 
     # --- Environment & Secrets ---
-    env               = optional(list(string))
+    env     = optional(list(string))
     secrets = optional(map(string))
 
     # --- Networking & DNS ---
-    network = optional(object({ 
+    network = optional(object({
       internal     = optional(bool, false)
       service_port = optional(number)
       networks = optional(list(object({
