@@ -6,7 +6,6 @@ locals {
     try([for n in var.service.network.networks : n.ip_address if n.ip_address != null][0], null)
   )
 
-  # Generate environment variables for OAuth if it's enabled for the service.
   oauth_envs = var.service.auth.oauth.enabled ? [
     for env_name, output_key in var.service.auth.oauth.keys :
     format(
@@ -16,6 +15,13 @@ locals {
         "client_id"      = module.oauth_authentication[0].client_id,
         "client_secret"  = module.oauth_authentication[0].client_secret,
         "well_known_url" = module.oauth_authentication[0].provider_info_url
+        "logout_url"     = module.oauth_authentication[0].logout_url
+        "authorize_url"  = module.oauth_authentication[0].authorize_url
+        "token_url"      = module.oauth_authentication[0].token_url
+        "user_info_url"  = module.oauth_authentication[0].user_info_url
+        "jwks_url"       = module.oauth_authentication[0].jwks_url
+        "issuer_url"     = module.oauth_authentication[0].issuer_url
+        "sign_out_url"   = module.oauth_authentication[0].logout_url
       }[output_key]
     )
   ] : []
