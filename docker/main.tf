@@ -7,6 +7,11 @@ terraform {
   }
 }
 
+provider "docker" {
+  host     = var.host_connection
+  ssh_opts = ["-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"]
+}
+
 resource "docker_image" "main" {
   name = var.container_image
 }

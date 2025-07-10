@@ -1,5 +1,5 @@
 module "proxy_authentication" {
-  source   = "git@github.com:DCCoder90/home-tf-modules.git//proxy_auth?ref=1.0.0"
+  source = "../proxy_auth"
 
   count = var.service.auth.enabled && var.service.auth.proxy.enabled ? 1 : 0
 
@@ -24,7 +24,7 @@ module "proxy_authentication" {
 }
 
 module "oauth_authentication" {
-  source   = "git@github.com:DCCoder90/home-tf-modules.git//oauth_auth?ref=1.0.0"
+  source = "../oauth_auth"
 
   count = var.service.auth.enabled && var.service.auth.oauth.enabled ? 1 : 0
 
@@ -32,8 +32,8 @@ module "oauth_authentication" {
   description                 = var.service.description
   name                        = var.service.service_name
   create_access_group         = true
-  access_group_name           = "tf_${var.service.service_name}"   
-  user_to_add_to_access_group = var.system.network_admin_username 
+  access_group_name           = "tf_${var.service.service_name}"
+  user_to_add_to_access_group = var.system.network_admin_username
   allowed_redirect_uris = concat(
     [
       {

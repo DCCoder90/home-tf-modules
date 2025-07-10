@@ -1,5 +1,5 @@
 module "service_container" {
-  source   = "git@github.com:DCCoder90/home-tf-modules.git//docker?ref=1.0.0"
+  source = "../docker"
 
   icon                   = var.service.icon
   web_ui                 = try(var.service.network.service_port, null) != null && local.service_ip_address != null ? "http://${local.service_ip_address}:${var.service.network.service_port}" : null
@@ -11,6 +11,7 @@ module "service_container" {
   mounts                 = var.service.mounts
   container_capabilities = var.service.capabilities
   commands               = var.service.commands
+  host_connection        = data.infisical_secrets.host_connections.secrets[var.service.host].value
 
   # Attach the container to custom networks defined in the stack, but only if the service
   # explicitly lists that network in its own configuration.

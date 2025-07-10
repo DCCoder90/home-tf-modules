@@ -3,6 +3,11 @@ variable "container_name" {
   description = "Name for the container to be created"
 }
 
+variable "host_connection" {
+  type        = string
+  description = "Host connection string"
+}
+
 variable "container_image" {
   type        = string
   description = "Name and tag of the image to use (ex. ubuntu:latest)"
@@ -25,8 +30,8 @@ variable "networks" {
 }
 
 variable "enable_gpu" {
-  type = bool
-  default = false
+  type        = bool
+  default     = false
   description = "If true, use nvidia runtime to add GPU support to the container."
 }
 
