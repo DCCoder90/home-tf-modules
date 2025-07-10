@@ -1,0 +1,92 @@
+name: Terraform Module Validation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  find_modules:
+    runs-on: ubuntu-latest
+    outputs:
+      module_dirs: ${{ steps.set_matrix.outputs.module_dirs }}
+    env:
+      MODULE_PATHS: "*" 
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Find Terraform Module Directories
+        id: set_matrix
+        shell: bash
+        run: |
+          declare -a module_dirs_array
+
+          # If MODULE_PATHS contains spaces, treat it as a list of explicit paths
+          if [[ "${{ env.MODULE_PATHS }}" == *" "* ]]; then
+            echo "Detected multiple explicit module paths from MODULE_PATHS env var."
+            read -ra module_dirs_array <<< "${{ env.MODULE_PATHS }}"
+          else
+            echo "Searching for modules using pattern: ${{ env.MODULE_PATHS }}"
+            mapfile -t module_dirs_array < <(find . -path "${{ env.MODULE_PATHS }}" -type d -exec sh -c 'ls -1 "{}"/*.tf &> /dev/null' \; -print)
+          fi
+
+          if [ ${#module_dirs_array[@]} -eq 0 ]; then
+            echo "No Terraform module directories found matching the pattern: ${{ env.MODULE_PATHS }}"
+            echo "::error::No Terraform module directories found. Please ensure MODULE_PATHS is correctly configured."
+            exit 1
+          fi
+
+          json_array=$(printf '%s\n' "${module_dirs_array[@]}" | jq -R . | jq -s .)
+          echo "Found the following module directories: $json_array"
+          echo "module_dirs=$json_array" >> "$GITHUB_OUTPUT"
+
+  validate_each_module:
+    needs: find_modules 
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module_dir: ${{ fromJson(needs.find_modules.outputs.module_dirs) }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "latest" 
+
+      - name: Validate Module ${{ matrix.module_dir }}
+        shell: bash
+        run: |
+          module_dir="${{ matrix.module_dir }}"
+          echo "--- Validating module: $module_dir ---"
+
+          if [ ! -d "$module_dir" ]; then
+            echo "Error: Directory $module_dir does not exist. This should not happen if 'find_modules' succeeded."
+            exit 1
+          fi
+
+          pushd "$module_dir" > /dev/null || { echo "Failed to change directory to $module_dir"; exit 1; }
+
+          echo "Running terraform init in $module_dir..."
+          if ! terraform init -backend=false -input=false -upgrade; then
+            echo "::error file=$module_dir::Terraform init failed for module: $module_dir"
+            exit 1
+          else
+            echo "Running terraform validate in $module_dir..."
+            if ! terraform validate; then
+              echo "::error file=$module_dir::Terraform validate failed for module: $module_dir"
+              exit 1
+            fi
+          fi
+
+          popd > /dev/null || { echo "Failed to return from directory"; exit 1; }
+          echo "Module $module_dir validated successfully!"
