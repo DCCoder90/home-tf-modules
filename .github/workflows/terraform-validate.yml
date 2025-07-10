@@ -15,7 +15,7 @@ jobs:
     outputs:
       module_dirs: ${{ steps.set_matrix.outputs.module_dirs }}
     env:
-      MODULE_PATHS: "*" 
+      MODULE_PATHS: "*"
       IGNORE_DIRS: ".git .github .terraform"
 
     steps:
@@ -27,23 +27,61 @@ jobs:
         shell: bash
         run: |
           declare -a module_dirs_array
+          declare -a ignore_dirs_list # Declare as array for easier iteration
 
-          exclude_paths=""
-          if [[ -n "${{ env.IGNORE_DIRS }}" ]]; then
-            echo "Ignoring directories: ${{ env.IGNORE_DIRS }}"
-            read -ra ignore_dirs_array <<< "${{ env.IGNORE_DIRS }}"
-            for dir in "${ignore_dirs_array[@]}"; do
-              exclude_paths+=" -path \"./$dir\" -prune -o"
-            done
-          fi
+          read -ra ignore_dirs_list <<< "${{ env.IGNORE_DIRS }}"
 
-          # If MODULE_PATHS contains spaces, treat it as a list of explicit paths
-          if [[ "${{ env.MODULE_PATHS }}" == *" "* ]]; then
-            echo "Detected multiple explicit module paths from MODULE_PATHS env var."
-            read -ra module_dirs_array <<< "${{ env.MODULE_PATHS }}"
-          else
-            echo "Searching for modules using pattern: ${{ env.MODULE_PATHS }}"
-            mapfile -t module_dirs_array < <(find . ${exclude_paths} -path "${{ env.MODULE_PATHS }}" -type d -exec sh -c 'ls -1 "{}"/*.tf &> /dev/null' \; -print)
+          echo "Searching for module directories..."
+
+          find . -type d -print0 | while IFS= read -r -d $'\0' dir; do
+              # Skip the current directory "." if MODULE_PATHS is not explicitly "." or "*"
+              if [[ "$dir" == "." && "${{ env.MODULE_PATHS }}" != "." && "${{ env.MODULE_PATHS }}" != "*" ]]; then
+                continue
+              fi
+
+              # Check if directory contains .tf files
+              if ! compgen -G "${dir}/*.tf" > /dev/null; then
+                  continue # Skip if no .tf files
+              fi
+
+              # Check if directory should be ignored
+              local is_ignored=false
+              for ignored_dir in "${ignore_dirs_list[@]}"; do
+                  if [[ "$dir" == "./$ignored_dir"* || "$dir" == "$ignored_dir"* ]]; then
+                      is_ignored=true
+                      break
+                  fi
+              done
+              if [[ "$is_ignored" == true ]]; then
+                  continue
+              fi
+
+              # Check if the directory matchesMODULE_PATHS pattern
+              local module_path_match=false
+              if [[ "${{ env.MODULE_PATHS }}" == *" "* ]]; then
+                  # Explicit list of paths
+                  read -ra explicit_paths <<< "${{ env.MODULE_PATHS }}"
+                  for path in "${explicit_paths[@]}"; do
+                      if [[ "$dir" == "$path" ]]; then
+                          module_path_match=true
+                          break
+                      fi
+                  done
+              else
+                  if [[ "$dir" == ${{ env.MODULE_PATHS }} ]]; then
+                      module_path_match=true
+                  fi
+              fi
+
+              if [[ "$module_path_match" == true ]]; then
+                  module_dirs_array+=("$dir")
+              fi
+          done
+
+          # Ensure `jq` is installed
+          if ! command -v jq &> /dev/null; then
+            echo "jq is not installed. Installing jq..."
+            sudo apt-get update && sudo apt-get install -y jq
           fi
 
           if [ ${#module_dirs_array[@]} -eq 0 ]; then
@@ -52,12 +90,18 @@ jobs:
             exit 1
           fi
 
+          # Filter out duplicates
+          IFS=$'\n' sorted_unique_dirs=($(sort -u <<<"${module_dirs_array[*]}"))
+          unset IFS
+          module_dirs_array=("${sorted_unique_dirs[@]}")
+
+          # Format the array
           json_array=$(printf '%s\n' "${module_dirs_array[@]}" | jq -R . | jq -s .)
           echo "Found the following module directories: $json_array"
           echo "module_dirs=$json_array" >> "$GITHUB_OUTPUT"
 
   validate_each_module:
-    needs: find_modules 
+    needs: find_modules
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -71,7 +115,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "latest" 
+          terraform_version: "latest"
 
       - name: Validate Module ${{ matrix.module_dir }}
         shell: bash
