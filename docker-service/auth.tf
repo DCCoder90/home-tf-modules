@@ -1,5 +1,5 @@
 module "proxy_authentication" {
-  source = "git@github.com:DCCoder90/home-tf-modules.git//proxy_auth?ref=1.0.0"
+  source = "../proxy_auth"
 
   count = var.service.auth.enabled && var.service.auth.proxy.enabled ? 1 : 0
 
@@ -24,7 +24,7 @@ module "proxy_authentication" {
 }
 
 module "oauth_authentication" {
-  source = "git@github.com:DCCoder90/home-tf-modules.git//oauth_auth?ref=1.0.0"
+  source = "../oauth_auth"
 
   count = var.service.auth.enabled && var.service.auth.oauth.enabled ? 1 : 0
 
