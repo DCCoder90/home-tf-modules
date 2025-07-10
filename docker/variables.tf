@@ -3,6 +3,11 @@ variable "container_name" {
   description = "Name for the container to be created"
 }
 
+variable "host_connection" {
+  type = string
+  description = "Host connection string"
+}
+
 variable "container_image" {
   type        = string
   description = "Name and tag of the image to use (ex. ubuntu:latest)"
