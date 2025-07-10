@@ -68,8 +68,9 @@ jobs:
                       fi
                   done
               else
+                  temp_module_paths="${{ env.MODULE_PATHS }}"
                   normalized_dir="${dir#./}"
-                  normalized_module_paths="${{ env.MODULE_PATHS }#./}"
+                  normalized_module_paths="${temp_module_paths#./}"
 
                   case "$normalized_dir" in
                       "$normalized_module_paths")
