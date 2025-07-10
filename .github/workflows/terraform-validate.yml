@@ -7,16 +7,25 @@ on:
   pull_request:
     branches:
       - main
-  workflow_dispatch:
+  workflow_dispatch: # Allows manual triggering of the workflow
 
 jobs:
+  # This job finds all Terraform module directories
   find_modules:
     runs-on: ubuntu-latest
     outputs:
       module_dirs: ${{ steps.set_matrix.outputs.module_dirs }}
     env:
-      MODULE_PATHS: "."
-      IGNORE_DIRS: ".git .github"
+      # Customize this variable to match the directory structure of your Terraform modules.
+      # Examples:
+      # - "modules/*": If your modules are directly under a 'modules' directory (e.g., modules/my-module, modules/another-module)
+      # - "*": If your modules are top-level directories in the repo (e.g., docker-network, docker-service)
+      # - "./docker-network ./docker-service": For specific known module paths
+      MODULE_PATHS: "./docker-network ./docker-service" # Adjust this based on your actual module locations
+
+      # Optional: Specify directories to ignore when searching for modules.
+      # Use space-separated paths, e.g., ".git .github .terraform"
+      IGNORE_DIRS: ".git .github .terraform"
 
     steps:
       - name: Checkout Repository
@@ -29,62 +38,109 @@ jobs:
           declare -a module_dirs_array
           declare -a ignore_dirs_list
 
+          # Split IGNORE_DIRS into an array
           read -ra ignore_dirs_list <<< "${{ env.IGNORE_DIRS }}"
 
           echo "Searching for module directories..."
 
-          find . -type d -print0 | while IFS= read -r -d $'\0' dir; do
-              # Skip the current directory "." if MODULE_PATHS is not explicitly "." or "*"
-              if [[ "$dir" == "." && "${{ env.MODULE_PATHS }}" != "." && "${{ env.MODULE_PATHS }}" != "*" ]]; then
-                continue
-              fi
+          # Build the find command's exclusion arguments
+          find_exclude_args=""
+          for ignored_dir in "${ignore_dirs_list[@]}"; do
+              # Ensure the path is relative to the current directory for find
+              # Add -path and -prune to exclude these directories from find's search
+              find_exclude_args+=" -path \"./$ignored_dir\" -prune"
+          done
 
-              # Check if directory should be ignored
-              is_ignored=false
+          # Use find to get all directories, excluding ignored ones, then filter in bash
+          # -mindepth 1 to exclude the current directory '.' from the initial find results
+          # unless it's explicitly included later by MODULE_PATHS logic.
+          # -print0 for safe handling of spaces/special chars
+          # `|| true` prevents `find` from exiting with an error if no results are found,
+          # allowing the script to continue and handle the empty list.
+          mapfile -t -d $'\0' potential_dirs < <(find . -mindepth 1 $find_exclude_args -type d -print0 || true)
+
+          # Add the current directory '.' to potential_dirs if MODULE_PATHS explicitly targets it or is '*'
+          if [[ "${{ env.MODULE_PATHS }}" == "." || "${{ env.MODULE_PATHS }}" == "*" ]]; then
+              # Check if '.' is explicitly ignored
+              is_dot_ignored=false
               for ignored_dir in "${ignore_dirs_list[@]}"; do
-                  if [[ "$dir" == "./$ignored_dir"* || "$dir" == "$ignored_dir"* ]]; then
-                      is_ignored=true
+                  if [[ "." == "./$ignored_dir"* || "." == "$ignored_dir"* ]]; then
+                      is_dot_ignored=true
                       break
                   fi
               done
-              if [[ "$is_ignored" == true ]]; then
-                  continue
+              if [[ "$is_dot_ignored" == false ]]; then
+                  # Add '.' to the beginning of the array if it's not ignored
+                  potential_dirs=("./" "${potential_dirs[@]}")
+              fi
+          fi
+
+
+          # Now iterate through potential_dirs and apply remaining filters
+          for dir in "${potential_dirs[@]}"; do
+              # Normalize directory path (remove leading './' for consistent matching)
+              normalized_dir="${dir#./}"
+              # If normalized_dir is empty, it means the original dir was '.'
+              if [[ -z "$normalized_dir" ]]; then
+                  normalized_dir="."
               fi
 
+              echo "Processing directory: $dir (normalized: $normalized_dir)"
+
+              # Check if directory contains .tf files
+              # This is a robust way to check for .tf files in the current directory
               if ! find "$dir" -maxdepth 1 -name "*.tf" -print -quit | grep -q .; then
-                  continue
+                  echo "  No .tf files found in $dir. Skipping."
+                  continue # Skip if no .tf files
               fi
+              echo "  .tf files found in $dir."
 
+              # Check if the directory matches the MODULE_PATHS pattern
               module_path_match=false
               if [[ "${{ env.MODULE_PATHS }}" == "*" ]]; then
                   # If pattern is '*', all non-ignored directories with .tf files are modules
                   module_path_match=true
+                  echo "  MODULE_PATHS is '*', matching $dir."
               elif [[ "${{ env.MODULE_PATHS }}" == *" "* ]]; then
+                  # Explicit list of paths (e.g., "./docker-network ./docker-service")
                   read -ra explicit_paths <<< "${{ env.MODULE_PATHS }}"
                   for path in "${explicit_paths[@]}"; do
-                      if [[ "$dir" == "$path" ]]; then
+                      local_path_normalized="${path#./}" # Normalize explicit paths too
+                      if [[ "$normalized_dir" == "$local_path_normalized" ]]; then
                           module_path_match=true
+                          echo "  Explicit path match: $normalized_dir == $local_path_normalized."
                           break
                       fi
                   done
               else
+                  # Single pattern (e.g., "modules/*", "./my-module")
+                  # Assign env var to a bash var first, then apply bash parameter expansion
                   temp_module_paths="${{ env.MODULE_PATHS }}"
-                  normalized_dir="${dir#./}"
-                  normalized_module_paths="${temp_module_paths#./}"
+                  normalized_module_paths="${temp_module_paths#./}" # This will be like "modules/*" or "docker-network"
 
+                  echo "  Checking pattern: normalized_dir='$normalized_dir', normalized_module_paths='$normalized_module_paths'"
+                  # Use case statement for robust pattern matching
+                  # IMPORTANT: $normalized_module_paths should NOT be quoted here if it contains glob characters
                   case "$normalized_dir" in
-                      "$normalized_module_paths")
+                      $normalized_module_paths) # Removed quotes around $normalized_module_paths to allow glob expansion
                           module_path_match=true
+                          echo "  Pattern match: $normalized_dir matches $normalized_module_paths."
+                          ;;
+                      *)
+                          echo "  Pattern no match: $normalized_dir does not match $normalized_module_paths."
                           ;;
                   esac
               fi
 
               if [[ "$module_path_match" == true ]]; then
                   module_dirs_array+=("$dir")
+                  echo "  Adding $dir to module_dirs_array."
+              else
+                  echo "  $dir did not match MODULE_PATHS criteria. Skipping."
               fi
           done
 
-          # Ensure `jq` is installed
+          # Ensure `jq` is installed for JSON processing
           if ! command -v jq &> /dev/null; then
             echo "jq is not installed. Installing jq..."
             sudo apt-get update && sudo apt-get install -y jq
@@ -96,21 +152,24 @@ jobs:
             exit 1
           fi
 
+          # Filter out duplicates and sort for consistent output
           IFS=$'\n' sorted_unique_dirs=($(sort -u <<<"${module_dirs_array[*]}"))
           unset IFS
           module_dirs_array=("${sorted_unique_dirs[@]}")
 
+          # Format the array as a JSON string for the matrix output
           json_array=$(printf '%s\n' "${module_dirs_array[@]}" | jq -R . | jq -s .)
           echo "Found the following module directories: $json_array"
           echo "module_dirs=$json_array" >> "$GITHUB_OUTPUT"
 
+  # This job validates each module found by the previous job
   validate_each_module:
-    needs: find_modules
+    needs: find_modules # This job depends on the 'find_modules' job
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
+      fail-fast: false # Allows other matrix jobs to continue even if one fails
       matrix:
-        module_dir: ${{ fromJson(needs.find_modules.outputs.module_dirs) }}
+        module_dir: ${{ fromJson(needs.find_modules.outputs.module_dirs) }} # Use the output from find_modules
 
     steps:
       - name: Checkout Repository
@@ -119,7 +178,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "latest"
+          terraform_version: "latest" # Or specify a version like "1.5.0"
 
       - name: Validate Module ${{ matrix.module_dir }}
         shell: bash
