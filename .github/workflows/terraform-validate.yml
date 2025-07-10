@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           declare -a module_dirs_array
-          declare -a ignore_dirs_list # Declare as array for easier iteration
+          declare -a ignore_dirs_list
 
           read -ra ignore_dirs_list <<< "${{ env.IGNORE_DIRS }}"
 
@@ -37,11 +37,6 @@ jobs:
               # Skip the current directory "." if MODULE_PATHS is not explicitly "." or "*"
               if [[ "$dir" == "." && "${{ env.MODULE_PATHS }}" != "." && "${{ env.MODULE_PATHS }}" != "*" ]]; then
                 continue
-              fi
-
-              # Check if directory contains .tf files
-              if ! compgen -G "${dir}/*.tf" > /dev/null; then
-                  continue # Skip if no .tf files
               fi
 
               # Check if directory should be ignored
@@ -56,10 +51,15 @@ jobs:
                   continue
               fi
 
-              # Check if the directory matchesMODULE_PATHS pattern
+              if ! find "$dir" -maxdepth 1 -name "*.tf" -print -quit | grep -q .; then
+                  continue
+              fi
+
               module_path_match=false
-              if [[ "${{ env.MODULE_PATHS }}" == *" "* ]]; then
-                  # Explicit list of paths
+              if [[ "${{ env.MODULE_PATHS }}" == "*" ]]; then
+                  # If pattern is '*', all non-ignored directories with .tf files are modules
+                  module_path_match=true
+              elif [[ "${{ env.MODULE_PATHS }}" == *" "* ]]; then
                   read -ra explicit_paths <<< "${{ env.MODULE_PATHS }}"
                   for path in "${explicit_paths[@]}"; do
                       if [[ "$dir" == "$path" ]]; then
@@ -68,9 +68,14 @@ jobs:
                       fi
                   done
               else
-                  if [[ "$dir" == ${{ env.MODULE_PATHS }} ]]; then
-                      module_path_match=true
-                  fi
+                  normalized_dir="${dir#./}"
+                  normalized_module_paths="${{ env.MODULE_PATHS }#./}"
+
+                  case "$normalized_dir" in
+                      "$normalized_module_paths")
+                          module_path_match=true
+                          ;;
+                  esac
               fi
 
               if [[ "$module_path_match" == true ]]; then
@@ -90,12 +95,10 @@ jobs:
             exit 1
           fi
 
-          # Filter out duplicates
           IFS=$'\n' sorted_unique_dirs=($(sort -u <<<"${module_dirs_array[*]}"))
           unset IFS
           module_dirs_array=("${sorted_unique_dirs[@]}")
 
-          # Format the array
           json_array=$(printf '%s\n' "${module_dirs_array[@]}" | jq -R . | jq -s .)
           echo "Found the following module directories: $json_array"
           echo "module_dirs=$json_array" >> "$GITHUB_OUTPUT"
