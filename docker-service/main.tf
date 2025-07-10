@@ -11,7 +11,7 @@ module "service_container" {
   mounts                 = var.service.mounts
   container_capabilities = var.service.capabilities
   commands               = var.service.commands
-  host_connection        = infisical_secrets.host_connections.secrets[var.service.host].value
+  host_connection        = data.infisical_secrets.host_connections.secrets[var.service.host].value
 
   # Attach the container to custom networks defined in the stack, but only if the service
   # explicitly lists that network in its own configuration.
