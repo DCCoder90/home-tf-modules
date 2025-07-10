@@ -15,12 +15,9 @@ data "infisical_secrets" "secrets" {
 }
 
 data "infisical_secrets" "host_connections" {
-  # Only fetch secrets if the stack configuration requests them.
-  count = (var.service.secrets != null && length(var.service.secrets) > 0) || (try(var.service.auth.proxy.enabled, false)) ? 1 : 0
-
   env_slug     = var.system.infisical.environment
   workspace_id = data.infisical_projects.home-net.id
-  # This path corresponds to where the root `secrets` module stores secrets.
+
   folder_path = var.system.infisical.host_connections
 }
 
