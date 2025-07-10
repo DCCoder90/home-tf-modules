@@ -15,8 +15,8 @@ jobs:
     outputs:
       module_dirs: ${{ steps.set_matrix.outputs.module_dirs }}
     env:
-      MODULE_PATHS: "./"
-      IGNORE_DIRS: ".git .github .terraform"
+      MODULE_PATHS: "*"
+      IGNORE_DIRS: ".git .github"
 
     steps:
       - name: Checkout Repository
