@@ -15,7 +15,7 @@ jobs:
     outputs:
       module_dirs: ${{ steps.set_matrix.outputs.module_dirs }}
     env:
-      MODULE_PATHS: "."
+      MODULE_PATHS: "./"
       IGNORE_DIRS: ".git .github .terraform"
 
     steps:
