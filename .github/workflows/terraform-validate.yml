@@ -43,7 +43,7 @@ jobs:
             read -ra module_dirs_array <<< "${{ env.MODULE_PATHS }}"
           else
             echo "Searching for modules using pattern: ${{ env.MODULE_PATHS }}"
-            mapfile -t module_dirs_array < <(find . -path "${{ env.MODULE_PATHS }}" -type d -exec sh -c 'ls -1 "{}"/*.tf &> /dev/null' \; -print)
+            mapfile -t module_dirs_array < <(find . ${exclude_paths} -path "${{ env.MODULE_PATHS }}" -type d -exec sh -c 'ls -1 "{}"/*.tf &> /dev/null' \; -print)
           fi
 
           if [ ${#module_dirs_array[@]} -eq 0 ]; then
