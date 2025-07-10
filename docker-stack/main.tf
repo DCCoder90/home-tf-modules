@@ -15,7 +15,7 @@ module "service_container" {
   for_each = var.stack.services
   source   = "git@github.com:DCCoder90/home-tf-modules.git//docker-service?ref=1.0.0"
 
-  service = each.value
+  service = merge(each.value, { host = var.stack.host })
   system  = var.system
 
   /*
