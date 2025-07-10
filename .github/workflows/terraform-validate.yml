@@ -45,7 +45,7 @@ jobs:
               fi
 
               # Check if directory should be ignored
-              local is_ignored=false
+              is_ignored=false
               for ignored_dir in "${ignore_dirs_list[@]}"; do
                   if [[ "$dir" == "./$ignored_dir"* || "$dir" == "$ignored_dir"* ]]; then
                       is_ignored=true
