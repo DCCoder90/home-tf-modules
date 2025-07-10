@@ -16,6 +16,7 @@ jobs:
       module_dirs: ${{ steps.set_matrix.outputs.module_dirs }}
     env:
       MODULE_PATHS: "*" 
+      IGNORE_DIRS: ".git .github .terraform"
 
     steps:
       - name: Checkout Repository
@@ -26,6 +27,15 @@ jobs:
         shell: bash
         run: |
           declare -a module_dirs_array
+
+          exclude_paths=""
+          if [[ -n "${{ env.IGNORE_DIRS }}" ]]; then
+            echo "Ignoring directories: ${{ env.IGNORE_DIRS }}"
+            read -ra ignore_dirs_array <<< "${{ env.IGNORE_DIRS }}"
+            for dir in "${ignore_dirs_array[@]}"; do
+              exclude_paths+=" -path \"./$dir\" -prune -o"
+            done
+          fi
 
           # If MODULE_PATHS contains spaces, treat it as a list of explicit paths
           if [[ "${{ env.MODULE_PATHS }}" == *" "* ]]; then
