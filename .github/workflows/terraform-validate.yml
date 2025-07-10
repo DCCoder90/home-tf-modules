@@ -57,7 +57,7 @@ jobs:
               fi
 
               # Check if the directory matchesMODULE_PATHS pattern
-              local module_path_match=false
+              module_path_match=false
               if [[ "${{ env.MODULE_PATHS }}" == *" "* ]]; then
                   # Explicit list of paths
                   read -ra explicit_paths <<< "${{ env.MODULE_PATHS }}"
