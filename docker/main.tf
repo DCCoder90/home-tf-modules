@@ -1,3 +1,12 @@
+terraform {
+  required_providers {
+    docker = {
+      source  = "kreuzwerker/docker"
+      version = "3.6.2"
+    }
+  }
+}
+
 resource "docker_image" "main" {
   name = var.container_image
 }
