@@ -1,7 +1,6 @@
 variable "stack" {
   type = object({
     host            = optional(string, "tower")
-    host_connection = optional(string)
     env             = optional(list(string))
     mounts          = optional(list(string))
     volumes         = optional(list(string))

@@ -15,7 +15,7 @@ module "service_container" {
   for_each = var.stack.services
   source   = "../docker-service"
 
-  service = merge(each.value, { host = var.stack.host, host_connection=var.stack.host_connection })
+  service = each.value
   system  = var.system
 
   /*
