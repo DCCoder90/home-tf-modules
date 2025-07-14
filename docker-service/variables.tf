@@ -20,9 +20,10 @@ variable "service" {
     volumes = optional(list(string))
 
     # --- Environment & Secrets ---
-    env     = optional(list(string))
-    secrets = optional(map(string))
-    host    = optional(string, "tower")
+    env             = optional(list(string))
+    secrets         = optional(map(string))
+    host            = optional(string, "tower")
+    host_connection = optional(string)
 
     # --- Networking & DNS ---
     network = optional(object({

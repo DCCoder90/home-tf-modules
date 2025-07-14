@@ -14,13 +14,6 @@ data "infisical_secrets" "secrets" {
   folder_path = var.system.infisical.folder
 }
 
-data "infisical_secrets" "host_connections" {
-  env_slug     = var.system.infisical.environment
-  workspace_id = data.infisical_projects.home-net.id
-
-  folder_path = var.system.infisical.host_connections
-}
-
 locals {
   # Create a list of environment variables from the secrets map.
   secret_envs = (var.service.secrets != null && length(var.service.secrets) > 0) ? [

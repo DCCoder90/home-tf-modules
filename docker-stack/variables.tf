@@ -1,10 +1,11 @@
 variable "stack" {
   type = object({
-    host    = optional(string, "tower")
-    env     = optional(list(string))
-    mounts  = optional(list(string))
-    volumes = optional(list(string))
-    networks = optional(map(object({
+    host            = optional(string, "tower")
+    host_connection = optional(string)
+    env             = optional(list(string))
+    mounts          = optional(list(string))
+    volumes         = optional(list(string))
+    networks        = optional(map(object({
       internal = optional(bool, false)
       driver   = optional(string, "bridge")
       options  = optional(map(string), {})
