@@ -43,7 +43,7 @@ module "oauth_authentication" {
     [
       for uri_path in coalesce(var.service.auth.oauth.redirect_uris, []) : {
         matching_mode = "strict",
-        url           = "https://${var.service.dns.domain_name}/${uri_path}"
+        url           = "${uri_path}"
       }
     ]
   )
