@@ -1,0 +1,59 @@
+name: Terraform Module Validation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  validate_each_module:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module_dir:
+          - "./authentik"
+          - "./dns"
+          - "./docker"
+          - "./docker-network"
+          - "./docker-service"
+          - "./docker-stack"
+          - "./nginx_config"
+          - "./oauth_auth"
+          - "./proxy_auth"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "latest"
+
+      - name: Validate Module ${{ matrix.module_dir }}
+        shell: bash
+        run: |
+          module_dir="${{ matrix.module_dir }}"
+          echo "--- Validating module: $module_dir ---"
+
+          pushd "$module_dir" > /dev/null || { echo "Failed to change directory to $module_dir"; exit 1; }
+
+          echo "Running terraform init in $module_dir..."
+          if ! terraform init -backend=false -input=false -upgrade; then
+            echo "::error file=$module_dir::Terraform init failed for module: $module_dir"
+            exit 1
+          else
+            echo "Running terraform validate in $module_dir..."
+            if ! terraform validate; then
+              echo "::error file=$module_dir::Terraform validate failed for module: $module_dir"
+              exit 1
+            fi
+          fi
+
+          popd > /dev/null || { echo "Failed to return from directory"; exit 1; }
+          echo "Module $module_dir validated successfully!"
